@@ -229,13 +229,13 @@ Temp<-temper[1]
 
     
     
-    Na[t+1, ]<- Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.05)#population dynamics
-    Np[t+1, ]<- Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.05)#population dynamics
+    Na[t+1, ]<- Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.025)#population dynamics
+    Np[t+1, ]<- Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.025)#population dynamics
     muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt#mean trait dynamics
     muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt #mean trait dynamics
     
-    Na[t+1,which(Na[t+1,] < 1e-6)]<-0
-    Np[t+1,which(Np[t+1,] < 1e-6)]<-0
+    Na[t+1,which(Na[t+1,] < 1e-4)]<-0
+    Np[t+1,which(Np[t+1,] < 1e-4)]<-0
   }
   
 return(list(Na=Na, Np=Np,muA=muA,muP=muP,Temp=Temp))

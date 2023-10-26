@@ -97,7 +97,7 @@ fact<-expand.grid(Temperature=15,
   
   dt<-0.1
   initial_temperature<- fact$Temperature[1]
-  env_var<-2.5 #temperature fluctuation range 
+  env_var<-1.5 #temperature fluctuation range 
   rate<-0 #rate of temperature increase, right now it is zero
   
   
@@ -108,14 +108,14 @@ fact<-expand.grid(Temperature=15,
   
   ic<-c(na,np,muA,muP) ## initial conditions coerced into a vector
   
-  tmax <- 5e3## time to integrate equations fors
+  tmax <- 3e3## time to integrate equations fors
   
   out<-eqs_euler(time = tmax,y = ic,pars = params)
 
   ts.plot(out$Na)
-  ts.plot(out$Np)
-  ts.plot(out$muA)  
-  ts.plot(out$temp)
+  ts.plot(out$Np[4000:5000,])
+  ts.plot(out$muA[1:1000,])  
+  ts.plot(out$Temp)
 
 
 #save(output, file ="warming_stoch_2.RData")
