@@ -79,7 +79,7 @@ fact<-expand.grid(Temperature=15,
   np<- runif( (Plantspecies) , 1,1)
   muA<- runif(Aspecies, 12, 25)  #initial mean phenotypic optimum trait values
   muP<- runif(Plantspecies, 12, 25)   #intial mean phenotypic optimum trait values
-  h2<-runif((Plantspecies+Aspecies), 0.1,0.2)
+  h2<-runif((Plantspecies+Aspecies), 0.1,0.25)
   
   
   
@@ -89,8 +89,7 @@ fact<-expand.grid(Temperature=15,
   gi <- 1
   ki <-0.1 #mortality rate
   w<- 7#mutualism interactir=1on width
-  Temp<-fact$Temperature[1]  #seq(Tmin, Tmax, by=(Tmax-Tmin)/50)
-  h2<-fact$h2[1] #heritability of trait variance 
+  Temp<-fact$Temperature[1]  #seq(Tmin, Tmax, by=(Tmax-Tmin)/50)#heritability of trait variance 
   Amatrix <- mat.comp(g)$Amatrix  #competition matrix , aij, for animals
   Pmatrix <- mat.comp(g)$Pmatrix  #competition matrix , aij, for plants
   mut.strength=1.5 #average mutualistic strength
