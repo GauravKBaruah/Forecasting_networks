@@ -72,14 +72,14 @@ fact<-expand.grid(Temperature=15,
   network_size<-Aspecies+Plantspecies
   
   #parameters for modelling: intialisation of the model
-  if(fact$var[r] == "high"){  sigma<-runif((Aspecies+Plantspecies), 0.05,0.09) 
+  if(fact$var[1] == "high"){  sigma<-runif((Aspecies+Plantspecies), 0.05,0.09) 
   }else {sigma <- runif((Aspecies+Plantspecies), 0.005,0.009)
   }#three species trait variance 
   na <- runif( (Aspecies) , 1,1)
   np<- runif( (Plantspecies) , 1,1)
   muA<- runif(Aspecies, 12, 25)  #initial mean phenotypic optimum trait values
   muP<- runif(Plantspecies, 12, 25)   #intial mean phenotypic optimum trait values
-  
+  h2<-runif((Plantspecies+Aspecies), 0.1,0.2)
   
   
   
@@ -104,7 +104,7 @@ fact<-expand.grid(Temperature=15,
   
   params<-list(matrix=g,bw=bw,aw=aw,h2=h2,w=w,Amatrix=Amatrix,Pmatrix=Pmatrix,web=fact$web[r],
                gi=gi,ki=ki,Temp=Temp, sigma=sigma,A=Aspecies,P=Plantspecies,degree=degree, env_var=env_var,
-               var=fact$var[r],gi=gi,bw=bw,h2=0.4,dt=dt,rate=rate,initial_temperature=initial_temperature,
+               var=fact$var[r],gi=gi,bw=bw,h2=h2,dt=dt,rate=rate,initial_temperature=initial_temperature,
                mut.strength=1.5,nestedness=nestedness,C=C,network_size=network_size)
   
   ic<-c(na,np,muA,muP) ## initial conditions coerced into a vector
@@ -116,6 +116,7 @@ fact<-expand.grid(Temperature=15,
   ts.plot(out$Na)
   ts.plot(out$Np)
   ts.plot(out$muA)  
+  ts.plot(out$temp)
 
 
 #save(output, file ="warming_stoch_2.RData")
