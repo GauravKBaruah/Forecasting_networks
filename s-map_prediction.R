@@ -65,7 +65,7 @@ system.time(for(r in 1:nrow(fact)){
   sigma<-runif((Aspecies+Pspecies), 0.05,0.09) 
   
   # read in data from pre-run with constant temperature
-  networkString = str_extract(fact$web[r], regex("M_PL_\\d+(_\\d+)?")) 
+  network_string = str_extract(fact$web[r], regex("M_PL_\\d+(_\\d+)?")) 
   nw_data_base <- readRDS(paste(networkString, "_constant_high_h2_010_025.rds", sep = ""))
   time_points_base <- length(nw_data_base$Temp)
   animal_abundances_base_final <- nw_data_base$Na[time_points_base,]
@@ -133,44 +133,6 @@ network_output = list.files(path = "network_output", pattern = regex("M_PL_\\d+(
 
 #------------------------------------------------------------------------------------------------------------------------
 
-ts <- 1                                                                         # time_series index, adjust accordingly
-ts_data_raw <- readRDS(network_output[ts])
-ts_data <- cbind(ts_data_raw$Na, ts_data_raw$Np)
-
-colnames <- c("A1")
-
-for(i in 2:ncol(ts_data_raw$Na)) {
-  colnames <- c(colnames, paste("A", i, sep = ""))
-}
-
-for(i in 1:ncol(ts_data_raw$Np)) {
-  colnames <- c(colnames, paste("P", i, sep = ""))
-}
-
-colnames(ts_data) <- colnames
-
-targ_col <- 8                                                                   # insert column of species, animals before plants in ts_data
-
-Embedding <- colnames                                                           # change 'colnames' to specific columns if necessary
-Edim <- length(Embedding)
-
-ts_data <- ts_data[, Embedding]
-
-coeff_names <- sapply(colnames(ts_data), function(x) paste("d", 
-                                                     colnames(ts_data)[targ_col], "d", x, sep = ""))
-
-block <- cbind(ts_data[2:dim(ts_data)[1], targ_col], ts_data[1:(dim(ts_data)[1] - 1),])
-norm_consts <- apply(block, 2, function(x) sd(x))
-block <- as.data.frame(apply(block, 2, function(x) (x - mean(x)) / sd(x)))
-
-lib <- 1:dim(block)[1]
-pred <- 1:dim(block)[1]
-theta <- 8
-
-coeff <- array(0, dim = c(length(pred), Edim))
-colnames(coeff) <- coeff_names
-coeff <- as.data.frame(coeff)
-
 lm_svdsolve <- function(y, x, ws, subset = seq_along(y)) {
   x <- x[subset, ]
   y <- y[subset]
@@ -191,50 +153,94 @@ lm_svdsolve <- function(y, x, ws, subset = seq_along(y)) {
   return (coeff)
 }
 
-for (ipred in 1:length(pred)) {
-  libs = lib[-pred[ipred]]
-  q <- matrix(as.numeric(block[pred[ipred], 2:dim(block)[2]]),
-              ncol = Edim, nrow = length(libs), byrow = TRUE)
-  distances <- sqrt(rowSums((block[libs, 2:dim(block)[2]] - q)^2))
-  dbar <- mean(distances)
-  Ws <- exp(-theta*distances/dbar)
-  svd_fit <- lm_svdsolve(block[libs, 1], block[libs, 2:dim(block)[2]], Ws)
-  coeff[ipred, ] <- svd_fit[-1]
+ts <- 1                                                                         # time_series index, adjust accordingly
+ts_data_raw <- readRDS(network_output[ts])
+network_identifier = str_extract(network_output[ts], regex("M_PL_\\d+(_\\d+)?_(rand)?(none)?_0.\\d+_\\d")) 
+
+ts_data <- cbind(ts_data_raw$Na, ts_data_raw$Np)
+
+colnames <- c("A1")
+
+for(i in 2:ncol(ts_data_raw$Na)) {
+  colnames <- c(colnames, paste("A", i, sep = ""))
 }
 
-coeff <- cbind(pred, coeff)
-colnames(coeff)[1] <- "t"
-
-for (i in 1:length(coeff_names)) {
-  cd = str_extract(coeff_names[i], regex("(?<=d)(A|P)(?=\\dd)"))                # clade of dependent species
-  ci = str_extract(coeff_names[i], regex("(?<=d(A|P)\\dd)(A|P)"))               # clade of independent species
-  
-  snum_d = str_extract(coeff_names[i], regex("(?<=d(A|P))\\d(?=d)"))            # which dependent species
-  snum_i = str_extract(coeff_names[i], regex("(?<=d(A|P)\\dd(A|P))\\d"))        # which independent species
-  
-  col_comp = "#cb1249"
-  col_mut = "#48ab49"
-  
-  par(mfrow = c(1,1))
-  coefflims = c(-0.5, 0.5)
-  trange <- 1:1000
-  plot(coeff[trange,"t"],coeff[trange,i + 1],type="l",col=if(cd == ci) col_comp else col_mut ,xlab="time",
-       ylab=bquote(partialdiff*.(cd)[.(snum_d)] / partialdiff*.(ci)[.(snum_i)]),
-       ylim=coefflims,xlim=range(trange),lwd=2)
-  abline(a=0 ,b=0 , lty="dashed", col="black", lwd=.5)
+for(i in 1:ncol(ts_data_raw$Np)) {
+  colnames <- c(colnames, paste("P", i, sep = ""))
 }
 
-assay <- "Some Assay"
-ylab <-bquote(.(cd) ~ AC50 ~ (mu*M))
-plot(0, xlab = xlab)
+colnames(ts_data) <- colnames
 
-par(mfrow = c(1,1))
-coefflims = c(-0.5, 0.5)
-trange <- 1:1000
-plot(coeff[trange,"t"],coeff[trange,8],type="l",col="blue",xlab="time",
-     ylab=expression(partialdiff*A[2] / partialdiff*P[1]),
-     ylim=coefflims,xlim=range(trange),lwd=2)
-abline(a=0 ,b=0 , lty="dashed", col="black", lwd=.5)
+jacobians <- list(matrix(0, length(colnames), length(colnames)))                # to store jacobians for every timepoint
+for(tp in 2:dim(ts_data_raw$Na)[1] - 1) {                                       # prepare list of jacobians for storage, dim(ts_data_raw$Na)[1] - 1 different timepoints
+  jacobians[[tp]] <- matrix(0, length(colnames), length(colnames))
+}
+
+for (targ_col in 1:length(colnames)) {                                          # targ_col =  column of dependent species, animals before plants in ts_data
+  Embedding <- colnames                                                         # change 'colnames' to specific columns if necessary
+  Edim <- length(Embedding)
+  
+  ts_data <- ts_data[, Embedding]
+  
+  coeff_names <- sapply(colnames(ts_data), function(x) paste("d", 
+                                                             colnames(ts_data)[targ_col], "d", x, sep = ""))
+  
+  block <- cbind(ts_data[2:dim(ts_data)[1], targ_col], ts_data[1:(dim(ts_data)[1] - 1),])
+  norm_consts <- apply(block, 2, function(x) sd(x))
+  block <- as.data.frame(apply(block, 2, function(x) (x - mean(x)) / sd(x)))
+  
+  lib <- 1:dim(block)[1]
+  pred <- 1:dim(block)[1]
+  
+  theta <- 8
+  
+  coeff <- array(0, dim = c(length(pred), Edim))
+  colnames(coeff) <- coeff_names
+  coeff <- as.data.frame(coeff)
+  
+  for (ipred in 1:length(pred)) {
+    libs = lib[-pred[ipred]]
+    q <- matrix(as.numeric(block[pred[ipred], 2:dim(block)[2]]),
+                ncol = Edim, nrow = length(libs), byrow = TRUE)
+    distances <- sqrt(rowSums((block[libs, 2:dim(block)[2]] - q)^2))
+    dbar <- mean(distances)
+    Ws <- exp(-theta*distances/dbar)
+    svd_fit <- lm_svdsolve(block[libs, 1], block[libs, 2:dim(block)[2]], Ws)
+    jacobians[[ipred]][,targ_col] <- coeff[ipred, ] <- svd_fit[-1]              # calculate partial derivatives and store in jacobian matrix for time point 'ipred'
+  }                                                                             # partial derivatives of targ_col with respect to other cols in coeff[ipred, ]
+  
+  coeff <- cbind(pred, coeff)
+  colnames(coeff)[1] <- "t"
+  
+  for (i in 1:length(coeff_names)) {
+    cd = str_extract(coeff_names[i], regex("(?<=d)(A|P)(?=\\dd)"))              # clade of dependent species
+    ci = str_extract(coeff_names[i], regex("(?<=d(A|P)\\dd)(A|P)"))             # clade of independent species
+    
+    snum_d = str_extract(coeff_names[i], regex("(?<=d(A|P))\\d+(?=d)"))         # which dependent species
+    snum_i = str_extract(coeff_names[i], regex("(?<=d(A|P)\\dd(A|P))\\d+"))     # which independent species
+    
+    col_comp = "#cb1249"
+    col_mut = "#48ab49"
+    
+    par(mfrow = c(1,1))
+    coefflims = c(-1, 2)
+    trange <- 1:1000
+    plot(coeff[trange,"t"],coeff[trange,i + 1],type="l",col=if(cd == ci) col_comp else col_mut ,
+         main = network_identifier,
+         xlab="time",
+         ylab=bquote(partialdiff*.(cd)[.(snum_d)] / partialdiff*.(ci)[.(snum_i)]),
+         ylim=coefflims,xlim=range(trange),lwd=2)
+    abline(a=0 ,b=0 , lty="dashed", col="black", lwd=.5)
+  }
+}
+
+#------------------------------------------------------------------------------------------------------------------------
+
+#     analysis of jacobians
+
+#------------------------------------------------------------------------------------------------------------------------
+
+Re(eigen(jacobians[[10]])$values[1])
 
 #------------------------------------------------------------------------------------------------------------------------
 
