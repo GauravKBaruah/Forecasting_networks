@@ -147,99 +147,6 @@ gausquad.plants<-function(m,sigma,w,h,np,na,mut.strength,points,mat,degree.plant
 cutoff <- function(x) ifelse(x<1, (1*(x>0))*(x*x*x*(10+x*(-15+6*x))), 1)
 
 eqs_euler <- function(time, y, pars) {
-  A <- dim(pars$matrix)[2]  ## number of animal species
-  P <-dim(pars$matrix)[1]
-  Np<- muP<-matrix(0, nrow=time, ncol=P)
-  Na<-muA<-matrix(0, nrow =time, ncol=A)
-  Np[1,]<-y[(A+1):(A+P)]
-  Na[1,]<-y[1:A]
-  muA[1,]<-y[(A+P+1):(A+P+A)]
-  muP[1,]<-y[(A+P+A+1):(A+P+A+P)]
-  ## define g, where g[i] is the selection pressure on species i from growth
-  alpha.a<-pars$Amatrix ## alpha matrix
-  alpha.p<-pars$Pmatrix
-  s<-pars$sig
-  #w<-pars$w
-  aij<-bij<-matrix(0, nrow=A,ncol=P) 
-  aji<-bji<-matrix(0, nrow=P,ncol=A) 
-  aj<-bj<-ai<-bi<-numeric()
-  degree.animals<-degree.plants<-numeric()
-  
-  dt<-pars$dt
-  
-  #degree of plants and anichmals
-  for(i in 1:P){
-    degree.plants[i]<-sum(pars$matrix[i,])} # degree of plants
-  for(j in 1:A){
-    degree.animals[j]<-sum(pars$matrix[,j]) # degree of animals
-  }
-  
-  temper<-Temp<-numeric()
-  temper[1]<-pars$initial_temperature
-  Temp<-temper[1]
-  aj<-bj<-ai<-bi<-vi<-vj<-numeric()
-  for (t in 1:(time-1)){
-    
-    temper[t+1]<-  temper[t] + pars$rate*pars$dt#+ rnorm(1,0,2)
-    Temp[t+1] <- rnorm(1,temper[t+1],sd=pars$env_var)
-    #growth rate of animals and plants as a function of current temperature locally
-    ba <- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[1:A]))*exp(-(Temp[t]- muA[t,])^2/(2*(pars$bw)^2+s[1:A])) - 0.2*exp(10^4*(1/(muA[t,]+273)- 1/(Temp[t]+273)))
-    bp <- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[(A+1):(A+P)]))*exp(-(Temp[t]- muP[t,])^2/(2*(pars$bw)^2+s[(A+1):(A+P)])) #- 0.2*exp(10^4*(1/(muP[t,]+273)- 1/(Temp[t]+273)))
-    
-    bar_ba <- pars$gi/(pars$bw)*exp(-(Temp[t]- muA[t,])^2/(2*(pars$bw)^2+s[1:A]))*s[1:A]*(pars$bw)*(Temp[t] -muA[t,])/((pars$bw)^2 + s[1:A])^1.5
-    bar_bp <-pars$gi/(pars$bw)*exp(-(Temp[t]- muP[t,])^2/(2*(pars$bw)^2+s[(A+1):(A+P)]))*s[(A+1):(A+P)]*(pars$bw)*(Temp[t] - muP[t,])/((pars$bw)^2 + s[(A+1):(A+P)])^1.5 
-    
-    for(r in 1:A){
-      for(l in 1:P){
-        #
-        m.temp<-list(ma=muA[t,r],mp=muP[t,l])
-        sigma1<-list(sa=s[r],sp=s[(A)+l])
-        
-        
-        temp1<-gausquad.animals(m=m.temp,sigma=sigma1,w=pars$w,h=0.25,np=Np[t,l],na=Na[t,r],
-                                mut.strength=pars$mut.strength, points=5,
-                                mat=pars$matrix[l,r],
-                                degree.animal = degree.animals[r])
-        aij[r,l]<-temp1$G
-        bij[r,l]<-temp1$B
-        
-      }
-      ai[r]<-sum(aij[r,])
-      bi[r]<-sum(bij[r,])
-      
-    }
-    for(k in 1:P){
-      for(m in 1:A){
-        m2.temp<-list(ma=muA[t,m],mp=muP[t,k])
-        sigma2<-list(sa=(s[m]),sp=(s[(A+k)]))
-        temp2<-gausquad.plants(m=m2.temp,sigma=sigma2,w=pars$w,h=0.25,np=Np[t,k],na=Na[t,m],
-                               mut.strength=pars$mut.strength,
-                               points=5,mat=pars$matrix[k,m], 
-                               degree.plant =degree.plants[k])
-        aji[k,m] <-temp2$G
-        bji[k,m]<-temp2$B
-        
-      }
-      aj[k]<-sum(aji[k,])
-      bj[k]<-sum(bji[k,])
-      
-    }
-    
-    
-    
-    Na[t+1, ]<- Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.025)#population dynamics
-    Np[t+1, ]<- Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.025)#population dynamics
-    muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt#mean trait dynamics
-    muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt #mean trait dynamics
-    
-    Na[t+1,which(Na[t+1,] < 1e-4)]<-0
-    Np[t+1,which(Np[t+1,] < 1e-4)]<-0
-  }
-  
-  return(list(Na=Na, Np=Np,muA=muA,muP=muP,Temp=Temp))
-}
-
-eqs_euler_2 <- function(time, y, pars) {
   A <- dim(pars$matrix)[2]  
   P <-dim(pars$matrix)[1]
   Np<- muP<-matrix(0, nrow=time, ncol=P)
@@ -277,7 +184,7 @@ eqs_euler_2 <- function(time, y, pars) {
     Temp[t+1] <- rnorm(1,temper[t+1],sd=pars$env_var)
     #growth rate of animals and plants as a function of current temperature locally
     ba<- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[1:A]))*exp(-(Temp[t]- muA[t,])^2/(2*(pars$bw)^2+s[1:A])) - 0.2*exp(10^4*(1/(muA[t,]+273)- 1/(Temp[t]+273)))
-    bp<- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[(A+1):(A+P)]))*exp(-(Temp[t]- muP[t,])^2/(2*(pars$bw)^2+s[(A+1):(A+P)])) - 0.2*exp(10^4*(1/(muP[t,]+273)- 1/(Temp[t]+273)))
+    bp<- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[(A+1):(A+P)]))*exp(-(Temp[t]- muP[t,])^2/(2*(pars$bw)^2+s[(A+1):(A+P)])) #- 0.2*exp(10^4*(1/(muP[t,]+273)- 1/(Temp[t]+273)))
     
     bar_ba<- pars$gi/(pars$bw)*exp(-(Temp[t]- muA[t,])^2/(2*(pars$bw)^2+s[1:A]))*s[1:A]*(pars$bw)*(Temp[t] -muA[t,])/((pars$bw)^2 + s[1:A])^1.5
     bar_bp<-pars$gi/(pars$bw)*exp(-(Temp[t]- muP[t,])^2/(2*(pars$bw)^2+s[(A+1):(A+P)]))*s[(A+1):(A+P)]*(pars$bw)*(Temp[t] - muP[t,])/((pars$bw)^2 + s[(A+1):(A+P)])^1.5 
@@ -320,10 +227,10 @@ eqs_euler_2 <- function(time, y, pars) {
     
     
     
-    Na[t+1, ]<- ifelse(Na[t, ] < 1e-6, 0, Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.025))#population dynamics
-    Np[t+1, ]<- ifelse(Np[t, ] < 1e-6, 0, Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.025))#population dynamics
-    muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt#mean trait dynamics
-    muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt #mean trait dynamics
+    Na[t+1, ]<- ifelse(Na[t, ] < 1e-6, 0, Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.1))# population dynamics
+    Np[t+1, ]<- ifelse(Np[t, ] < 1e-6, 0, Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.1))# population dynamics
+    muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt                                         # mean trait dynamics
+    muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt                                        # mean trait dynamics
     
     Na[t+1,which(Na[t+1,] < 1e-4)]<-0
     Np[t+1,which(Np[t+1,] < 1e-4)]<-0
