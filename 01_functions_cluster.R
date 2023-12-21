@@ -146,19 +146,17 @@ gausquad.plants<-function(m,sigma,w,h,np,na,mut.strength,points,mat,degree.plant
 
 cutoff <- function(x) ifelse(x<1, (1*(x>0))*(x*x*x*(10+x*(-15+6*x))), 1)
 
-
-
 eqs_euler <- function(time, y, pars) {
-  A <- dim(pars$matrix)[2]  ## number of animal species
+  A <- dim(pars$matrix)[2]  
   P <-dim(pars$matrix)[1]
   Np<- muP<-matrix(0, nrow=time, ncol=P)
-  Na<-muA<-matrix(0, nrow =time, ncol=A)
-  Np[1,]<-y[(A+1):(A+P)]
+  Na<- muA<-matrix(0, nrow =time, ncol=A)
   Na[1,]<-y[1:A]
+  Np[1,]<-y[(A+1):(A+P)]
   muA[1,]<-y[(A+P+1):(A+P+A)]
   muP[1,]<-y[(A+P+A+1):(A+P+A+P)]
   ## define g, where g[i] is the selection pressure on species i from growth
-  alpha.a<-pars$Amatrix ## alpha matrix
+  alpha.a<-pars$Amatrix # alpha matrix
   alpha.p<-pars$Pmatrix
   s<-pars$sig
   #w<-pars$w
@@ -168,21 +166,21 @@ eqs_euler <- function(time, y, pars) {
   degree.animals<-degree.plants<-numeric()
   
   dt<-pars$dt
-
-  #degree of plants and anichmals
+  
+  #degree of plants and animals
   for(i in 1:P){
     degree.plants[i]<-sum(pars$matrix[i,])} # degree of plants
   for(j in 1:A){
     degree.animals[j]<-sum(pars$matrix[,j]) # degree of animals
   }
   
-temper<-Temp<-numeric()
-temper[1]<-pars$initial_temperature
-Temp<-temper[1]
+  temper<-Temp<-numeric()
+  temper[1]<-pars$initial_temperature
+  Temp<-temper[1]
   aj<-bj<-ai<-bi<-vi<-vj<-numeric()
   for (t in 1:(time-1)){
     
-    temper[t+1]<-  temper[t]+ pars$rate*temper[t]*pars$dt#+ rnorm(1,0,2)
+    temper[t+1] <- temper[t] + pars$rate * pars$dt #*temper[t]*pars$dt#+ rnorm(1,0,2)
     Temp[t+1] <- rnorm(1,temper[t+1],sd=pars$env_var)
     #growth rate of animals and plants as a function of current temperature locally
     ba<- pars$gi/(pars$bw)*(pars$bw)/(sqrt((pars$bw)^2+s[1:A]))*exp(-(Temp[t]- muA[t,])^2/(2*(pars$bw)^2+s[1:A])) - 0.2*exp(10^4*(1/(muA[t,]+273)- 1/(Temp[t]+273)))
@@ -196,19 +194,19 @@ Temp<-temper[1]
         #
         m.temp<-list(ma=muA[t,r],mp=muP[t,l])
         sigma1<-list(sa=s[r],sp=s[(A)+l])
-
+        
         
         temp1<-gausquad.animals(m=m.temp,sigma=sigma1,w=pars$w,h=0.25,np=Np[t,l],na=Na[t,r],
-                                        mut.strength=pars$mut.strength, points=5,
-                                        mat=pars$matrix[l,r],
-                                        degree.animal = degree.animals[r])
+                                mut.strength=pars$mut.strength, points=5,
+                                mat=pars$matrix[l,r],
+                                degree.animal = degree.animals[r])
         aij[r,l]<-temp1$G
         bij[r,l]<-temp1$B
-      
+        
       }
       ai[r]<-sum(aij[r,])
       bi[r]<-sum(bij[r,])
- 
+      
     }
     for(k in 1:P){
       for(m in 1:A){
@@ -220,25 +218,26 @@ Temp<-temper[1]
                                degree.plant =degree.plants[k])
         aji[k,m] <-temp2$G
         bji[k,m]<-temp2$B
-      
+        
       }
       aj[k]<-sum(aji[k,])
       bj[k]<-sum(bji[k,])
- 
+      
     }
-
     
     
-    Na[t+1, ]<- Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.025)#population dynamics
-    Np[t+1, ]<- Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.025)#population dynamics
-    muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt#mean trait dynamics
-    muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt #mean trait dynamics
+    
+    Na[t+1, ]<- ifelse(Na[t, ] < 1e-6, 0, Na[t,] + Na[t,]*(ba-alpha.a%*%Na[t,]+ai)*pars$dt + rnorm(A,0,0.1))# population dynamics
+    Np[t+1, ]<- ifelse(Np[t, ] < 1e-6, 0, Np[t,] + Np[t,]*(bp-alpha.p%*%Np[t,]+aj)*pars$dt + rnorm(P,0,0.1))# population dynamics
+    muA[t+1, ]<- muA[t,]+ pars$h2[1:A]*(bar_ba+ bij%*%Np[t,])*pars$dt                                         # mean trait dynamics
+    muP[t+1, ]<-  muP[t,]+ pars$h2[1:P]*(bar_bp+ bji%*%Na[t,])*pars$dt                                        # mean trait dynamics
     
     Na[t+1,which(Na[t+1,] < 1e-4)]<-0
     Np[t+1,which(Np[t+1,] < 1e-4)]<-0
+
   }
   
-return(list(Na=Na, Np=Np,muA=muA,muP=muP,Temp=Temp))
+  return(list(Na=Na, Np=Np,muA=muA,muP=muP,Temp=Temp))
 }
 
 
@@ -299,8 +298,8 @@ cluster_run<-function(params, ic, tmax ){
   sol<-ode(func=eqs_noise, y=ic, parms=params, times=seq(0, tmax, by=tmax/500)) %>% ## solve ODEs
     organize_results(params) 
   
-  A<-params$A # no. of animal species
-  P<- params$P #no. of plant species
+  A<-params$A  # no. of animal species
+  P<- params$P # no. of plant species
   sol<-  sol %>% filter(time == tmax)
   
   Na<-sol %>% filter(type =="N")
@@ -571,13 +570,97 @@ mat.comp<-function(matrix){
   Aspecies<- dim(matrix)[2]
   Plantspecies<- dim(matrix)[1]
   
-  Amatrix<-matrix(runif(Aspecies^2, 0.0001, 0.001), nrow=Aspecies, ncol = Aspecies)/Aspecies #scaled by number of competitors within a guild
-  diag(Amatrix)<-1 #intraspecific competition for animals
-  Pmatrix<-matrix(runif(Plantspecies^2, 0.0001, 0.001), nrow=Plantspecies, ncol = Plantspecies)/Plantspecies ##scaled by number of competitors within a guild
-  diag(Pmatrix)<-1 #intraspecific competion for plants
+  Amatrix<-matrix(runif(Aspecies^2, 0.0001, 0.001), nrow=Aspecies, ncol = Aspecies)/Aspecies                 # scaled by number of competitors within a guild
+  diag(Amatrix)<-1                                                                                           # intraspecific competition for animals
+  Pmatrix<-matrix(runif(Plantspecies^2, 0.0001, 0.001), nrow=Plantspecies, ncol = Plantspecies)/Plantspecies # scaled by number of competitors within a guild
+  diag(Pmatrix)<-1                                                                                           # intraspecific competion for plants
   
   out<-return(list(Amatrix=Amatrix,Pmatrix=Pmatrix))
   
 }
 
+# function for calculating extinction time points of every species --> stored in fact
+# could be optimized by only storing time_point once for every species
+calculate_extinction_tps <- function(out, network_size, fact, r) {
+  all_extinct <- FALSE
+  time_point <- 1
+  
+  while(!all_extinct) {
+    species_abundances <- c((out$Na)[time_point,], (out$Np)[time_point,])
+    surviving_species <- which(species_abundances > 1e-6)
+    
+    for(i in (surviving_species)) {
+      fact$extinction_tps[[r]][i] <- time_point
+    }
+ 
+    all_extinct <- length(surviving_species) == 0
 
+    time_point <- time_point + 1
+    if(time_point > 5000) {
+      break
+    }
+  }
+
+  return(fact)
+}
+
+
+
+
+#------------------------------------------------------------------------------
+#
+#         Misc
+#
+#------------------------------------------------------------------------------
+
+# calculate_extinction <- function(out, network_size, fact) {
+#   min(which(out$Na < 1e-6))
+# }
+
+##test
+
+##
+
+# calculate_extinction <- function(out, network_size, fact) {
+#   extinction_times_sum <- 0
+#   first_extinct <- FALSE
+#   all_extinct <- FALSE
+#   new_extinction <- FALSE
+#   species_richness <- network_size # initial richness
+#   species_richness_current <- network_size
+#   
+#   time_point = 1
+#   while(!all_extinct) {
+#     species_abundances = c((out$Na)[time_point,], (out$Np)[time_point,])
+#     species_richness_current <- length(which(species_abundances > 1e-6))
+#     abundance_diff = species_richness_current - species_richness
+#     new_extinction <- abundance_diff < 0
+#     
+#     if(new_extinction) {
+#       extinction_times_sum = extinction_times_sum - time_point * abundance_diff # difference because abundance_diff < 0
+#       
+#       if(!first_extinct) {
+#         fact[r,"tp_first_extinction"] = time_point
+#         first_extinct <- TRUE
+#       }
+#       
+#       species_richness <- species_richness_current
+#       new_extinction <- FALSE
+#       all_extinct <- species_richness == 0
+#       
+#     }
+#     
+#     time_point = time_point + 1
+#     if(time_point > 5000) {
+#       abundance_diff = -species_richness_current
+#       extinction_times_sum = extinction_times_sum - 5000 * abundance_diff
+#       break
+#     }
+#     #print(time_point)
+#   }
+#   
+#   fact[r,"tp_last_extinction"] = time_point - 1
+#   fact[r,"average_time_to_extinction"] = extinction_times_sum / network_size
+#   
+#   return(fact)
+# 
